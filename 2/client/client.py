@@ -21,11 +21,11 @@ while(1):
         data = s.recv(BUFFER_SIZE)
         amount_received += len(data)
         data_res += data
-        #if not data: break
-        if data_res == 'exit':
+        if data_res == 'exit' or not data_res:
             break
 
-    if data_res == 'exit': break
+    if data_res == 'exit' or not data_res:
+        break
     print 'received data:', data_res
     amount_received = 0
 s.close()
