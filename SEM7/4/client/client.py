@@ -1,0 +1,191 @@
+import socket
+import errno
+import datetime
+import time
+import os
+import struct
+import sys
+
+rst = 0
+flag = 0
+MESS_len = 0
+BUFFER_SIZE = 50
+
+class Client():
+    def __init__(self, s):
+        self.s = s
+
+    def send_file_len(self, length_encode):
+        global rst
+        global flag
+        flag = 0
+        while flag == 0:
+            try:
+                if rst == 0:
+                    self.s.send('beg')
+
+                temp = self.s.recv(1)
+                if temp != '1':
+                    flag = 0
+                else:
+                    flag = 1
+                self.s.send(str(length_encode))
+            except socket.timeout:
+                try:
+                    self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self.s.connect((TCP_IP, TCP_PORT))
+                    timeval = struct.pack('ll', 5, 0)
+                    self.s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO, timeval)
+                    temp = self.s.recv(1)
+                    if temp != '1':
+                        flag = 0
+                    else:
+                        flag = 1
+                    self.s.send(str(length_encode))
+                except socket.timeout:
+                    print 'Timeout'
+                    self.s.close()
+                    return
+            except socket.error, err:
+                self.s.close()
+                return
+        return
+
+    def send_file_name(self, length_encode, file_name):
+        global rst
+        global flag
+        flag = 0
+        while flag == 0:
+            try:
+                if rst == 1:
+                    self.s.send('add')
+                    self.send_file_len(length_encode)
+                    rst = 0
+
+                temp = self.s.recv(1)
+                if temp != '1':
+                    flag = 0
+                else:
+                    flag = 1
+                self.s.send(file_name)
+            except socket.timeout:
+                try:
+                    self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self.s.connect((TCP_IP, TCP_PORT))
+                    timeval = struct.pack('ll', 5, 0)
+                    self.s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO, timeval)
+                    self.send_file_len(length_encode)
+                    temp = self.s.recv(1)
+                    if temp != '1':
+                        flag = 0
+                    else:
+                        flag = 1
+
+                    self.s.send(file_name)
+                except socket.timeout:
+                    print 'Timeout'
+                    self.s.close()
+                    return
+            except socket.error, err:
+                self.s.close()
+                return
+        return
+
+    def send_file_data(self, length_encode, file_name, data):
+        global rst
+        global flag
+        flag = 0
+        while flag == 0:
+            try:
+                temp = self.s.recv(1)
+                if temp != '1':
+                    flag = 0
+                else:
+                    flag = 1
+                self.s.send(data)
+            except socket.timeout:
+                try:
+                    self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self.s.connect((TCP_IP, TCP_PORT))
+
+                    timeval = struct.pack('ll', 5, 0)
+                    self.s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO, timeval)
+                    self.s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVTIMEO, timeval)
+
+                    self.send_file_name(length_encode, file_name)
+                    temp = self.s.recv(1)
+                    if temp != '1':
+                        flag = 0
+                    else:
+                        flag = 1
+                    self.s.send(data)
+                except socket.timeout:
+                    print 'Timeout'
+                    self.s.close()
+                    return
+
+            except socket.error, err:
+                self.s.close()
+                return
+        return
+
+    def run(self):
+        global flag
+        global MESS_len
+        if sys.argv[1] == '2':
+            file_name = 'Daft Punk - The Son of Flynn.mp3'#'labs.pdf'#'Meat Loaf - Everything Louder Than Everyth else (clean version).mp3'
+        else:
+            file_name = 'Meat Loaf - Everything Louder Than Everyth else (clean version).mp3'#'labs.pdf'#'Meat Loaf - Everything Louder Than Everyth else (clean version).mp3'
+        if sys.argv[1] == '3':
+            file_name = '1'
+        try:
+            file = open(file_name, "rb")
+        except Exception:
+            print 'File Not Found'
+            return
+        length_encode = chr(len(file_name))
+        timeval = struct.pack('ll', 5, 0)
+        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_SNDTIMEO, timeval)
+
+        self.send_file_len(length_encode)
+        self.send_file_name(length_encode, file_name)
+
+        i = 1
+        MESS_len = 0
+        filesize = os.stat(file_name).st_size
+        global BUFFER_SIZE
+        while True:
+            if flag == 0:
+                return
+            try:
+                MESSAGE = file.read(BUFFER_SIZE)
+                MESS_len += len(MESSAGE)
+            except Exception:
+                file.close()
+                print 'File Error'
+                self.s.close()
+                return
+            if len(MESSAGE) == 0:
+                break
+            self.send_file_data(length_encode, file_name, MESSAGE)
+            if MESS_len >= filesize / 10 * i:
+                enc = chr(10 * i)
+                self.s.send(str(enc), socket.MSG_OOB)
+                i += 1
+        file.close()
+        self.s.close()
+        return
+
+
+TCP_IP = '127.0.0.1'
+TCP_PORT = 2001
+BUFFER_SIZE = 50
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s.settimeout(5.0)
+try:
+    s.connect((TCP_IP, TCP_PORT))
+except Exception:
+    print 'Wrong IP'
+else:
+    Client(s).run()
