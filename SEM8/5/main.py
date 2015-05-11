@@ -1,6 +1,5 @@
 from mpi4py import MPI
 import numpy
-#import time
 
 N = 512
 
@@ -33,11 +32,7 @@ if rank == 0:
 			else:
 				comm.Send(A[(i * N * rows) : (i + 1) * N * rows], dest=(i + 1), tag=0)	
 
-
-#comm.Barrier()
-
 if rank != 0:
-	
 	if rows * (size - 1) != N and rank == size - 1:
 		rows = rows + (N - (size - 1) * rows)
 	
